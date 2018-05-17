@@ -23,6 +23,15 @@ import android.widget.Toast;
 import java.io.IOException;
 import java.io.InputStream;
 
+// Numerical Edge SDK Imports:
+import com.numericcal.dnn.Config;
+import com.numericcal.dnn.Manager;
+import com.numericcal.dnn.Handle;
+
+import io.reactivex.Single;
+
+
+
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener {
 

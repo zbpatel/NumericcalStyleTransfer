@@ -1,12 +1,16 @@
 package com.patel.zachary.numericcalstyletransfer;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.util.Pair;
 import android.view.View;
@@ -46,6 +50,8 @@ public class MainActivity extends AppCompatActivity
 
     Manager.Dnn netManager = null;
 
+    // boolean to activate external storage related methods if permissions have been granted
+    private boolean ENABLE_STORAGE_FUNCTIONS = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -206,11 +212,63 @@ public class MainActivity extends AppCompatActivity
         return res;
     }
 
+    // Constant passed to the callback method for granting requests
+    private final int REQUEST_WRITE_EXTERNAL_STORAGE = 1;
 
-    public void storeImageExternal(Bitmap toStore) {
+    public void requestStoragePermissions() {
+        // Checks if the user has granted this app permission to write to external storage in the
+        // past. If it hasn't, then ask for permission
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            Log.i(LOG_TAG, "App requesting storage permissions from user.");
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+                // If the user has denied this permission in the past, provide a message explaining
+                // why it is needed
+                String explanationMsg = "This app needs permission to write to external storage in order to save photos to your device.";
 
+                // prompting the user with a toast
+                Toast.makeText(getApplicationContext(), explanationMsg, Toast.LENGTH_LONG).show();
+            }
+
+            // Requesting the permission
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    REQUEST_WRITE_EXTERNAL_STORAGE);
+
+        } else {
+            // if we reach this method, we know that write permissions have already been added so
+            // enable storage functionality (which should already be true at this point)
+            ENABLE_STORAGE_FUNCTIONS = true;
+        }
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[],
+                                          int[] grantResults) {
+        // callback method for ActivityCompat.requestPermissions
+        switch (requestCode) {
+            case REQUEST_WRITE_EXTERNAL_STORAGE: {
+                if (grantResults.length > 0 &&
+                        grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Log.i(LOG_TAG, "App granted WRITE_EXTERNAL_STORAGE permissions.");
+                    ENABLE_STORAGE_FUNCTIONS = true;
+                } else {
+                    Log.i(LOG_TAG, "App denied WRITE_EXTERNAL_STORAGE permissions.");
+                    ENABLE_STORAGE_FUNCTIONS = false;
+                }
+            }
+            // add additional cases if more permissions are needed in future
+        }
+    }
+    
+    public void storeImageExternal(Bitmap toStore) {
+        if (ENABLE_STORAGE_FUNCTIONS) {
+            // TODO: store the image to external storage (TBD)
+        } else {
+            // If storage functions are disabled, do nothing (perhaps prompt user for permissions)
+        }
+    }
 
     @Override
     public void onBackPressed() {

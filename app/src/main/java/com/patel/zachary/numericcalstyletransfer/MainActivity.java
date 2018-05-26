@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.util.Log;
+import android.util.Pair;
 import android.view.View;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
@@ -22,6 +23,7 @@ import android.widget.Toast;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 // Numerical Edge SDK Imports:
 import com.numericcal.dnn.Config;
@@ -41,6 +43,9 @@ public class MainActivity extends AppCompatActivity
 
     // stores the image last selected by the user in way that is easily communicable between fns
     private Bitmap lastSelectedImage = null;
+
+    Manager.Dnn netManager = null;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,8 +88,29 @@ public class MainActivity extends AppCompatActivity
                 applyFilterClickHandler(view);
             }
         });
+
+
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        // initializing netManager
+        netManager = Manager.create(getApplicationContext());
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        // Only remove the model on a pause that isn't a rotation change
+        if (!isChangingConfigurations() && netManager != null) {
+            netManager.release();
+            netManager = null;
+        }
+
+    }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -139,20 +165,50 @@ public class MainActivity extends AppCompatActivity
                     .setAction("Action", null).show();
 
         } else {
-
+            //TODO: start processing of image
+            applyFilterToImage(lastSelectedImage);
         }
 
         Log.i(LOG_TAG, "Exiting applyFilterClickHandler");
     }
 
+    private List<Object> getModelInfo(Single<Handle.Rx> modelDnn) {
+        Single<Pair<Integer, Integer>> hw = modelDnn.map(handle -> new Pair<>(
+                        handle.info.inputShape().get(1),
+                        handle.info.inputShape().get(2)));
+    }
 
-    public void applyFilterToImage(Bitmap toTransform) {
+    private Bitmap applyFilterToImage(Bitmap toTransform) {
         // Calls the necessary DNN code to execute a transformation of the provided image
         Log.i(LOG_TAG, "Started applyFilterToImage");
 
-        // TODO: add code to transform the image
+        Bitmap res = null;
+
+        // Step 1: load input dimensions from model
+        int inputH = toTransform.getWidth();
+        int inputW = toTransform.getHeight();
+        int modelH = 0;
+        int modelW = 0;
+
+        // Step 2: resize currently selected bitmap
+        // set filter = true to get better image performance if upscaling
+        Bitmap scaled = Bitmap.createScaledBitmap(toTransform, modelH, modelW, true);
+
+        // Step 3: apply filter
+        // TODO
+
+        // Step 4: resize image back to original dimensions
+        Bitmap res = Bitmap.createBitmap(res, inputH, inputW, true);
 
         Log.i(LOG_TAG, "Exiting applyFilterToImage");
+
+
+        return res;
+    }
+
+
+    public void storeImageExternal(Bitmap toStore) {
+
     }
 
 
@@ -188,6 +244,11 @@ public class MainActivity extends AppCompatActivity
         return super.onOptionsItemSelected(item);
     }
 
+    private Single<Handle.Rx> configDnnHandle(String modelID) {
+        Config.Model netCfg = Config.model(modelID).downloadUpdates(false).reportPerformance(false);
+        return netManager.createHandle(netCfg);
+    }
+
     @Override
     public boolean onNavigationItemSelected(MenuItem item) {
         // Handle navigation view item clicks here.
@@ -214,13 +275,14 @@ public class MainActivity extends AppCompatActivity
 
 
     //  ---- Misc. Helper Functions:
-    private Bitmap loadBitmap(Uri bmp_uri) throws IOException {
+    private Bitmap loadBitmap(Uri bmpURI) throws IOException {
+        // https://developer.android.com/topic/performance/graphics/load-bitmap
         // loads a bitmap from a URI
         // in order to be safe, this method "scans" the image twice, the first time looking to find the
         // size of the image (and throw an error if the size is weird) and then to actually load it
         Bitmap result = null;
 
-        InputStream input_stream = this.getContentResolver().openInputStream(bmp_uri);
+        InputStream input_stream = this.getContentResolver().openInputStream(bmpURI);
 
         // using the Android BitmapFactory class to deal with loading bitmaps
         // first, configure some misc options (how we want the image to load)
@@ -236,7 +298,7 @@ public class MainActivity extends AppCompatActivity
         BitmapFactory.Options loadOptions = new BitmapFactory.Options();
 
         // re-opening input stream
-        input_stream = this.getContentResolver().openInputStream(bmp_uri);
+        input_stream = this.getContentResolver().openInputStream(bmpURI);
         result = BitmapFactory.decodeStream(input_stream, null, loadOptions);
         input_stream.close();
         return result;

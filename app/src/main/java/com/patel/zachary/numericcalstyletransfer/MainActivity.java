@@ -7,6 +7,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
@@ -25,8 +26,13 @@ import android.view.MenuItem;
 import android.widget.Button;
 import android.widget.Toast;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Calendar;
+import java.util.GregorianCalendar;
 import java.util.List;
 
 // Numerical Edge SDK Imports:
@@ -50,8 +56,14 @@ public class MainActivity extends AppCompatActivity
 
     Manager.Dnn netManager = null;
 
+    // -------------------- Storage Related
     // boolean to activate external storage related methods if permissions have been granted
     private boolean ENABLE_STORAGE_FUNCTIONS = false;
+
+    private final String EXTERNAL_STORAGE_FOLDER_NAME = "Style Transfer";
+
+    // setting compression factor to 100 to preserve image quality
+    private final int PNG_COMPRESSION_FACTOR = 100;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -155,7 +167,8 @@ public class MainActivity extends AppCompatActivity
         getImageIntent.setType("image/*");
         getImageIntent.setAction(Intent.ACTION_GET_CONTENT);
 
-        startActivityForResult(Intent.createChooser(getImageIntent, "Select Picture"), PICK_IMAGE_REQUEST_CODE);
+        startActivityForResult(Intent.createChooser(getImageIntent, "Select Picture"),
+                PICK_IMAGE_REQUEST_CODE);
 
         Log.i(LOG_TAG, "Exiting PickImageButtonHandler");
 
@@ -188,7 +201,7 @@ public class MainActivity extends AppCompatActivity
         // Calls the necessary DNN code to execute a transformation of the provided image
         Log.i(LOG_TAG, "Started applyFilterToImage");
 
-        Bitmap res = null;
+        Bitmap res = null; //TODO: set to null eventually... this is just to stop warnings
 
         // Step 1: load input dimensions from model
         int inputH = toTransform.getWidth();
@@ -204,7 +217,9 @@ public class MainActivity extends AppCompatActivity
         // TODO
 
         // Step 4: resize image back to original dimensions
-        Bitmap res = Bitmap.createBitmap(res, inputH, inputW, true);
+        if (res != null) {
+            res = Bitmap.createScaledBitmap(res, inputH, inputW, true);
+        }
 
         Log.i(LOG_TAG, "Exiting applyFilterToImage");
 
@@ -261,14 +276,93 @@ public class MainActivity extends AppCompatActivity
             // add additional cases if more permissions are needed in future
         }
     }
-    
+
     public void storeImageExternal(Bitmap toStore) {
         if (ENABLE_STORAGE_FUNCTIONS) {
             // TODO: store the image to external storage (TBD)
-        } else {
-            // If storage functions are disabled, do nothing (perhaps prompt user for permissions)
+
+            // Step 1: Check if external storage is available
+            if (isExternalStorageWritable()) {
+                // Grabbing this app's folder in external storage
+                File file = new File(Environment.getExternalStoragePublicDirectory(
+                        Environment.DIRECTORY_PICTURES), EXTERNAL_STORAGE_FOLDER_NAME);
+
+                // Creating a folder if it doesn't exist
+                if (!file.exists()) {
+                    Log.i(LOG_TAG, "Creating new directory for photos");
+                    file.mkdirs();
+                }
+
+                // checking if there is enough space to save the picture (to avoid IOExceptions)
+                // basing the size of the image on the number of bytes allocated to store its
+                // pixels in memory (which should be an upper bound on the size needed to store it
+                // in external storage)
+                // note, we add 2^20 to ensure that there is at least a megabyte difference
+                if (file.getFreeSpace() >  (toStore.getAllocationByteCount() + 2^20)) {
+                    // making a new file for the image:
+                    // TODO: add a "cleaner" way of ensuring unique filenames
+                    // currently just setting it to "<current time>.png"
+                    String timeStr = Calendar.getInstance().getTime().toString();
+                    File newFile = new File(file.toString() + File.separator + timeStr +
+                            ".png");
+
+                    Log.i(LOG_TAG, "Storing file as: " + timeStr + ".png.");
+
+                    // creating a stream to write our file
+                    FileOutputStream outputStream = null;
+                    try {
+                        outputStream = new FileOutputStream(newFile);
+                        Bitmap toStoreCPY = toStore.copy(toStore.getConfig(), true);
+                        toStoreCPY.compress(Bitmap.CompressFormat.PNG, PNG_COMPRESSION_FACTOR,
+                                outputStream);
+
+
+                    } catch (Exception e) {
+                        // Setting this to catch general exceptions, but almost certainly
+                        // IOException is the only kind that could happen
+                        Log.e(LOG_TAG, "Error when attempting to store file: " + timeStr +
+                                ".png.");
+                    } finally {
+                        // closing the file output stream
+                        // (this is done in the finally because there could be an error after the
+                        // stream has been created (in which case it still needs to be closed)
+                        try {
+                            if (outputStream != null) {
+                                outputStream.close();
+                                Log.i(LOG_TAG, "FileOutputStream closed");
+                            }
+                        } catch (Exception e) {
+                            Log.e(LOG_TAG, "Error when attempting to close FileOutputStream");
+                        }
+                    }
+                } else {
+                    // logging that we were unable to store
+                    String eMessage = "Failed to store image, needed: " +
+                            toStore.getAllocationByteCount() + " bytes, only found: " +
+                            file.getFreeSpace() + ".";
+                    Log.e(LOG_TAG, eMessage);
+
+                    // sending the user a toast
+                    Toast.makeText(getApplicationContext(), "Not enough space to save image.",
+                            Toast.LENGTH_LONG).show();
+                }
+            } else {
+                Log.i(LOG_TAG, "External Storage Unavailable");
+                // If storage functions are disabled, do nothing (perhaps prompt user)
+            }
         }
     }
+
+    public boolean isExternalStorageWritable() {
+        // Google provided method of checking for external storage writability
+        // via: https://developer.android.com/training/data-storage/files#java
+        String state = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED.equals(state)) {
+            return true;
+        }
+        return false;
+    }
+
 
     @Override
     public void onBackPressed() {

@@ -24,6 +24,7 @@ import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import java.io.File;
@@ -107,7 +108,19 @@ public class MainActivity extends AppCompatActivity
             }
         });
 
+        Button saveImageButton = (Button) findViewById(R.id.saveImageButton);
+        saveImageButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Log.i(LOG_TAG, "saveImageButton pressed.");
+                if (lastSelectedImage != null) {
+                    storeImageExternal(lastSelectedImage);
+                }
+            }
+        });
 
+        // if storage permissions haven't been granted, prompt the user:
+        requestStoragePermissions();
     }
 
     @Override
@@ -145,7 +158,11 @@ public class MainActivity extends AppCompatActivity
 
                 if (loadedImage == null) { throw new IOException("Bitmap has improper bounds."); }
 
+                Log.i(LOG_TAG, "Updating lastSelectedImage");
                 lastSelectedImage = loadedImage;
+                if (lastSelectedImage != null) {
+                    setSelectedImageView(lastSelectedImage);
+                }
             } catch (IOException e) {
                 e.printStackTrace();
                 // pop a (short) toast saying that we were unable to load the image
@@ -174,6 +191,17 @@ public class MainActivity extends AppCompatActivity
 
     }
 
+
+    public void setSelectedImageView(Bitmap b) {
+        ImageView selectedImageView = (ImageView) findViewById(R.id.selectedImageView);
+        Log.i(LOG_TAG, "In sSIV");
+        if (b != null) {
+            selectedImageView.setImageBitmap(b);
+            Log.i(LOG_TAG, "Updating SelectedImageView");
+
+        }
+    }
+
     public void applyFilterClickHandler(View view) {
         // Handler for the applyFilter button
         // on a press, applies the user selected filter to the user selected image
@@ -191,11 +219,12 @@ public class MainActivity extends AppCompatActivity
         Log.i(LOG_TAG, "Exiting applyFilterClickHandler");
     }
 
+    /*
     private List<Object> getModelInfo(Single<Handle.Rx> modelDnn) {
         Single<Pair<Integer, Integer>> hw = modelDnn.map(handle -> new Pair<>(
                         handle.info.inputShape().get(1),
                         handle.info.inputShape().get(2)));
-    }
+    } */
 
     private Bitmap applyFilterToImage(Bitmap toTransform) {
         // Calls the necessary DNN code to execute a transformation of the provided image
@@ -278,9 +307,13 @@ public class MainActivity extends AppCompatActivity
     }
 
     public void storeImageExternal(Bitmap toStore) {
+        // promting the user to grant permissions
+        requestStoragePermissions();
+
         if (ENABLE_STORAGE_FUNCTIONS) {
             // TODO: store the image to external storage (TBD)
 
+            Log.i(LOG_TAG, "Attempting to store image to external storage.");
             // Step 1: Check if external storage is available
             if (isExternalStorageWritable()) {
                 // Grabbing this app's folder in external storage
@@ -350,6 +383,8 @@ public class MainActivity extends AppCompatActivity
                 Log.i(LOG_TAG, "External Storage Unavailable");
                 // If storage functions are disabled, do nothing (perhaps prompt user)
             }
+        } else {
+            Log.i(LOG_TAG, "Not attempting to store image.");
         }
     }
 

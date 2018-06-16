@@ -119,6 +119,21 @@ public class MainActivity extends AppCompatActivity
             }
         });
 
+        // Setting click handlers for the imageViews in the scrollview
+        ImageView svTest1 = (ImageView) findViewById(R.id.svTest1);
+        svTest1.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Log.i(LOG_TAG, "svTest1Clicked");
+            }
+        });
+        ImageView svTest2 = (ImageView) findViewById(R.id.svTest2);
+        svTest2.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Log.i(LOG_TAG, "svTest2Clicked");
+            }
+        });
         // if storage permissions haven't been granted, prompt the user:
         requestStoragePermissions();
     }
@@ -173,6 +188,11 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
+    protected void loadModel(String modelID) {
+        // loads the model with the given ID
+        // (often called by the selection of an image in the scrollview)
+        return;
+    }
 
     public void pickImageButtonClickHandler(View view) {
         // Handler for the pickImage button
